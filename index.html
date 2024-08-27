@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess-Like Game</title>
+    <style>
+        #board {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            grid-template-rows: repeat(5, 50px);
+            gap: 1px;
+            margin-bottom: 20px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid black;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .player-a {
+            background-color: lightblue;
+        }
+        .player-b {
+            background-color: lightcoral;
+        }
+        .active {
+            border: 2px solid yellow;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chess-Like Game</h1>
+    <div id="board"></div>
+    <p id="status">Waiting for the other player...</p>
+    <p id="turn"></p>
+
+    <!-- Game rules section -->
+    <div class="game-rules">
+        <h2>Game Rules:</h2>
+        <p>1. The game is played between two players on a 5x5 grid.</p>
+        <p>2. Each player controls a team of 5 characters: Pawns, Hero1, and Hero2.</p>
+        <p>3. Players arrange their characters on their respective starting rows at the beginning of the game.</p>
+        <p>4. Characters have the following movement rules:</p>
+        <ul>
+            <li>Pawns: Move one block in any direction (Left, Right, Forward, Backward).</li>
+            <li>Hero1: Moves two blocks straight in any direction, killing any opponent's character in its path.</li>
+            <li>Hero2: Moves two blocks diagonally in any direction, killing any opponent's character in its path.</li>
+        </ul>
+        <p>5. Players alternate turns, making one move per turn.</p>
+        <p>6. If a character moves to a space occupied by an opponent's character, the opponent's character is removed from the game.</p>
+        <p>7. The game ends when one player eliminates all of their opponent's characters.</p>
+        <p>8. The grid is displayed after each turn, showing all character positions.</p>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const board = document.getElementById('board');
+        const statusDisplay = document.getElementById('status');
+        const turnDisplay = document.getElementById('turn');
+        const room = 'game1'; // Example room name
+        const username = prompt('Enter your name:');
+
+        const teamA = ['A-P1', 'A-H1', 'A-H2', 'A-P2', 'A-P3'];
+        const teamB = ['B-P1', 'B-H1', 'B-H2', 'B-P2', 'B-P3'];
+        let player = null;
+        let isMyTurn = false;
+        let selectedCharacter = null;
+
+        socket.emit('join_game', {room, username});
+
+        // Create the game board
+        for (let i = 0; i < 25; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.index = i;
+            cell.addEventListener('click', () => {
+                if (isMyTurn && selectedCharacter) {
+                    const move = {cell: i, character: selectedCharacter};
+                    socket.emit('make_move', {room, move});
+                } else if (isMyTurn) {
+                    selectCharacter(i);
+                }
+            });
+            board.appendChild(cell);
+        }
+
+        // Initialize the board with player positions
+        function initializeBoard() {
+            const cells = document.querySelectorAll('.cell');
+            teamA.forEach((character, index) => {
+                cells[index].textContent = character;
+                cells[index].classList.add('player-a');
+            });
+            teamB.forEach((character, index) => {
+                cells[24 - index].textContent = character;
+                cells[24 - index].classList.add('player-b');
+            });
+        }
+
+        // Handle character selection
+        function selectCharacter(index) {
+            const cells = document.querySelectorAll('.cell');
+            const selectedCell = cells[index];
+            if (selectedCell.textContent && selectedCell.textContent.startsWith(player)) {
+                selectedCharacter = selectedCell.textContent;
+                cells.forEach(cell => cell.classList.remove('active'));
+                selectedCell.classList.add('active');
+            }
+        }
+
+        // Update the board when a move is made
+        socket.on('update_board', ({board, currentPlayer}) => {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, i) => {
+                cell.textContent = board[i];
+                cell.className = 'cell'; // Reset classes
+                if (board[i]) {
+                    cell.classList.add(board[i].startsWith('A') ? 'player-a' : 'player-b');
+                }
+            });
+            isMyTurn = currentPlayer === player;
+            turnDisplay.textContent = isMyTurn ? "Your turn!" : "Opponent's turn";
+            selectedCharacter = null;
+        });
+
+        // Handle status updates
+        socket.on('status', data => {
+            if (data.username === username) {
+                player = data.player;
+                isMyTurn = player === 'A';
+                turnDisplay.textContent = isMyTurn ? "Your turn!" : "Waiting for opponent...";
+            }
+            statusDisplay.textContent = data.msg;
+        });
+
+        socket.on('invalid_move', msg => {
+            alert(msg);
+        });
+
+        // Initialize board on load
+        initializeBoard();
+    </script>
+</body>
+</html>
