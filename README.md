@@ -57,6 +57,4 @@ Game Rules
 - Players alternate turns. A character can eliminate an opponent's character by moving to the same cell.
 - The game ends when one player eliminates all of the opponent's characters.
 
-Contributing
-
 Contributions are welcome! If you have suggestions or improvements, please create a pull request or open an issue.
